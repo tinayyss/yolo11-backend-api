@@ -6,7 +6,7 @@ import os
 app = Flask(__name__)
 CORS(app)
 
-# In-memory database
+# Databases (Temporary/In-Memory)
 users = []
 detections = []
 
@@ -14,50 +14,43 @@ detections = []
 def home():
     return "YOLO11 Cloud API is Running!"
 
-# --- AUTH: REGISTER ---
+# --- AUTH LOGIC ---
 @app.route('/register', methods=['POST'])
 def register():
     data = request.get_json()
-    if not data:
-        return jsonify({"error": "No data"}), 400
+    if any(u['username'] == data['username'] for u in users):
+        return jsonify({"message": "Username exists"}), 400
     users.append(data)
-    return jsonify({"message": "User registered successfully"}), 201
+    return jsonify({"message": "User created"}), 201
 
-# --- CRUD: READ (GET) ---
-@app.route('/detections', methods=['GET'])
-def get_detections():
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    user = next((u for u in users if u['username'] == data['username'] and u['password'] == data['password']), None)
+    if user:
+        return jsonify({"message": "Success", "name": user['name']}), 200
+    return jsonify({"message": "Failed"}), 401
+
+# --- CRUD LOGIC ---
+@app.route('/detections', methods=['GET', 'POST'])
+def handle_detections():
+    if request.method == 'POST':
+        data = request.get_json()
+        new_log = {
+            "id": len(detections) + 1,
+            "object": data.get('object', 'Unknown'),
+            "confidence": data.get('confidence', '0%'),
+            "time": datetime.datetime.now().strftime("%I:%M %p"),
+            "status": "Active"
+        }
+        detections.append(new_log)
+        return jsonify(new_log), 201
     return jsonify(detections[::-1]), 200
 
-# --- CRUD: CREATE (POST) ---
-@app.route('/detections', methods=['POST'])
-def add_detection():
-    data = request.get_json()
-    new_entry = {
-        "id": len(detections) + 1,
-        "object": data.get('object', 'Unknown'),
-        "confidence": data.get('confidence', '0%'),
-        "time": datetime.datetime.now().strftime("%I:%M %p"),
-        "zone": data.get('zone', 'Main Entrance'),
-        "status": "Pending"
-    }
-    detections.append(new_entry)
-    return jsonify(new_entry), 201
-
-# --- CRUD: UPDATE (PUT) - Toggle Status ---
-@app.route('/detections/<int:id>', methods=['PUT'])
-def toggle_detection(id):
-    data = request.get_json()
-    for item in detections:
-        if item['id'] == id:
-            item['status'] = data.get('status', 'Verified')
-            return jsonify(item), 200
-    return jsonify({"error": "Not found"}), 404
-
-# --- CRUD: DELETE (DELETE) ---
 @app.route('/detections/<int:id>', methods=['DELETE'])
 def delete_detection(id):
     global detections
-    detections = [d for d in detections if d['id'] != id]
+    detections = [log for log in detections if log['id'] != id]
     return jsonify({"message": "Deleted"}), 200
 
 if __name__ == '__main__':
