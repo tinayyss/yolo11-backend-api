@@ -6,7 +6,7 @@ import os
 app = Flask(__name__)
 CORS(app)
 
-# Databases (Temporary/In-Memory)
+# Temporary Database
 users = []
 detections = []
 
@@ -14,14 +14,13 @@ detections = []
 def home():
     return "YOLO11 Cloud API is Running!"
 
-# --- AUTH LOGIC ---
 @app.route('/register', methods=['POST'])
 def register():
     data = request.get_json()
     if any(u['username'] == data['username'] for u in users):
         return jsonify({"message": "Username exists"}), 400
     users.append(data)
-    return jsonify({"message": "User created"}), 201
+    return jsonify({"message": "Success"}), 201
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -31,7 +30,6 @@ def login():
         return jsonify({"message": "Success", "name": user['name']}), 200
     return jsonify({"message": "Failed"}), 401
 
-# --- CRUD LOGIC ---
 @app.route('/detections', methods=['GET', 'POST'])
 def handle_detections():
     if request.method == 'POST':
@@ -46,6 +44,15 @@ def handle_detections():
         detections.append(new_log)
         return jsonify(new_log), 201
     return jsonify(detections[::-1]), 200
+
+@app.route('/detections/<int:id>', methods=['PUT'])
+def update_detection(id):
+    data = request.get_json()
+    for log in detections:
+        if log['id'] == id:
+            log['status'] = data.get('status', 'Active')
+            return jsonify(log), 200
+    return jsonify({"message": "Not found"}), 404
 
 @app.route('/detections/<int:id>', methods=['DELETE'])
 def delete_detection(id):
